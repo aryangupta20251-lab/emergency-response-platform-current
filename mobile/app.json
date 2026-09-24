@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Emergency Response Platform",
+    "slug": "emergency-response-platform",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "emergencyresponse",
+    "plugins": ["expo-router"]
+  }
+}

@@ -1,0 +1,2 @@
+import PlaceholderPage from '../components/PlaceholderPage'
+export default function ReservedPage({ title }) { return <div className="page-content"><div className="page-header"><div><h1 className="page-title">{title}</h1><p className="page-subtitle">Frontend structure is ready for the next phase.</p></div></div><PlaceholderPage title={`${title} UI coming in the next phase`} description="Navigation and the reusable design system are established. This screen will be implemented only when its development phase is approved." /></div> }
