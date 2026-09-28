@@ -29,10 +29,10 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --include-workspace-root
 
       - name: Build web frontend
-        run: npm run web:build
+        run: npm --workspace web run build
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
