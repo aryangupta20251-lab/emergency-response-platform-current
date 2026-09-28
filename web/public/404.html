@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting...</title>
+    <script type="text/javascript">
+      (function () {
+        const repo = '/emergency-response-platform'
+        const path = window.location.pathname || '/'
+        const redirect = path.startsWith(repo) ? path.slice(repo.length) || '/' : path
+        sessionStorage.redirect = redirect + window.location.search + window.location.hash
+        window.location.replace(`${repo}/`)
+      })()
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -8,6 +8,8 @@ import { ResponderProvider } from './context/ResponderContext'
 import { AdminManagementProvider } from './context/AdminManagementContext'
 import AppErrorBoundary from './components/AppErrorBoundary'
 
+const basename = import.meta.env.PROD ? '/emergency-response-platform' : '/'
+
 export default function App() {
-  return <AppErrorBoundary><BrowserRouter><AuthProvider><NotificationProvider><ContactsProvider><ResponderProvider><AdminManagementProvider><AccidentReportProvider><AppRoutes /></AccidentReportProvider></AdminManagementProvider></ResponderProvider></ContactsProvider></NotificationProvider></AuthProvider></BrowserRouter></AppErrorBoundary>
+  return <AppErrorBoundary><BrowserRouter basename={basename}><AuthProvider><NotificationProvider><ContactsProvider><ResponderProvider><AdminManagementProvider><AccidentReportProvider><AppRoutes /></AccidentReportProvider></AdminManagementProvider></ResponderProvider></ContactsProvider></NotificationProvider></AuthProvider></BrowserRouter></AppErrorBoundary>
 }
