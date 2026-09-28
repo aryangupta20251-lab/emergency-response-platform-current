@@ -1,0 +1,10 @@
+import { ClipboardCheck, Search } from 'lucide-react'
+import { useState } from 'react'
+import Card from '../components/Card'
+import { auditLogEntries } from '../data/adminAnalyticsData'
+
+export default function AdminAuditPage() {
+  const [query, setQuery] = useState('')
+  const filtered = auditLogEntries.filter((entry) => `${entry.actor} ${entry.action} ${entry.object} ${entry.status}`.toLowerCase().includes(query.toLowerCase()))
+  return <div className="page-content admin-page audit-page"><div className="page-header"><div><span className="eyebrow"><ClipboardCheck size={14} /> Admin audit</span><h1 className="page-title">Audit log</h1><p className="page-subtitle">A mock record of activity within the demo control center.</p></div></div><div className="dashboard-demo-note"><span className="status-dot status-dot--info" /><span>Simulated audit log</span><small>No backend audit events are being recorded.</small></div><Card className="audit-toolbar"><label className="incident-search"><Search size={17} /><span className="sr-only">Search audit log</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search actor, action, object, or status" /></label></Card>{filtered.length ? <Card className="audit-table-card"><div className="audit-table"><div className="audit-row audit-row--header"><span>Timestamp</span><span>Actor</span><span>Action</span><span>Related object</span><span>Status/details</span></div>{filtered.map((entry) => <div className="audit-row" key={entry.id}><span data-label="Timestamp">{entry.timestamp}</span><span data-label="Actor"><strong>{entry.actor}</strong></span><span data-label="Action">{entry.action}</span><span data-label="Related object">{entry.object}</span><span data-label="Status/details"><strong>{entry.status}</strong><small>{entry.detail}</small></span></div>)}</div></Card> : <Card className="notification-empty"><ClipboardCheck size={25} /><h2>No audit entries found</h2><p>Try a different search.</p></Card>}</div>
+}

@@ -1,0 +1,1 @@
+Add product services here when backend business logic is introduced. Tasks 1–5 only establish the server and health endpoints.

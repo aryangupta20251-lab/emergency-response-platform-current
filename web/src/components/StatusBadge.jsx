@@ -10,7 +10,11 @@ const toneMap = {
   Responding: 'warning',
   Arrived: 'success',
   Resolved: 'success',
-  Cancelled: 'emergency'
+  Cancelled: 'emergency',
+  Available: 'success',
+  Unavailable: 'emergency',
+  Busy: 'warning',
+  Offline: 'info'
 }
 
 export default function StatusBadge({ label }) {
