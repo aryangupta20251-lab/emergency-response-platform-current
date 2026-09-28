@@ -9,7 +9,10 @@ import { ResponderProvider } from './context/ResponderContext'
 import { AdminManagementProvider } from './context/AdminManagementContext'
 import AppErrorBoundary from './components/AppErrorBoundary'
 
-const basename = import.meta.env.PROD ? '/emergency-response-platform' : '/'
+const basename = import.meta.env.PROD
+  ? (new URL(document.baseURI).pathname.replace(/\/+$/, '') || '/')
+  : '/'
+
 const themeStorageKey = 'emergency-response-theme'
 const accentStorageKey = 'emergency-response-accent'
 
