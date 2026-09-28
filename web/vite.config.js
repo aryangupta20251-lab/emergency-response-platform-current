@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const repoName = 'emergency-response-platform'
+const repoName = 'emergency-response-platform-current'
 
 export default defineConfig({
   base: process.env.NODE_ENV === 'production' ? `/${repoName}/` : '/',
