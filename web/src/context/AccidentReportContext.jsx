@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react'
+import { useAuth } from './AuthContext'
 import { accidentReportService } from '../services/accidentReportService'
 
 const initialReport = {
@@ -17,6 +18,7 @@ const AccidentReportContext = createContext(null)
 
 export function AccidentReportProvider({ children }) {
   const [report, setReport] = useState(initialReport)
+  const { token } = useAuth()
 
   const updateReport = useCallback((updates) => setReport((current) => ({ ...current, ...updates })), [])
   const resetReport = useCallback(() => setReport(initialReport), [])
@@ -50,10 +52,10 @@ export function AccidentReportProvider({ children }) {
     )
   }, [])
   const submitReport = useCallback(async () => {
-    const submittedReport = await accidentReportService.submit(report)
+    const submittedReport = await accidentReportService.submit(report, token)
     setReport((current) => ({ ...current, submittedReport }))
     return submittedReport
-  }, [report])
+  }, [report, token])
 
   return <AccidentReportContext.Provider value={{ report, updateReport, resetReport, requestLocation, submitReport }}>{children}</AccidentReportContext.Provider>
 }

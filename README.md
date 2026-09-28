@@ -1,92 +1,104 @@
 # Emergency Response Platform
 
-Frontend-only Emergency Response Platform for organizing road-accident reports, citizen support flows, responder demos, hospital directories, and admin operations views.
+A full-stack emergency response platform for reporting road incidents, managing responder workflows, and supporting admin oversight. The project includes a React/Vite web frontend, a Node.js/Express API, and PostgreSQL data persistence.
 
 ## Technology stack
 
-- React 19
-- Vite 7
-- React Router 6
-- Lucide React icons
-- CSS design tokens and responsive CSS
-- Expo Router and React Native for the mobile workspace foundation
+- React 19 + Vite 7 + React Router 6
+- Node.js + Express
+- PostgreSQL
+- JWT-based authentication and role-based authorization
+- Socket.IO for realtime notifications and incident updates
+- Leaflet/OpenStreetMap map tiles for location-aware views
 
 ## Project structure
 
 ```text
 EmergencyResponsePlatform/
-	docs/             Design and screen documentation
-	web/              React/Vite web application
-		src/components/ Shared UI, layouts, maps, timelines, and states
-		src/context/    Mock auth, report, contact, responder, and admin state
-		src/data/       Centralized demo datasets
-		src/pages/      Citizen, responder, and admin screens
-		src/services/   Replaceable mock service boundaries
-		src/styles/     Design tokens and global responsive styles
-	mobile/           Expo Router mobile foundation
+  backend/           Express API and PostgreSQL integration
+  docs/              Design and product documentation
+  mobile/            Expo/mobile app foundation
+  web/               Vite React frontend for browser deployment
+  .github/workflows/ GitHub Pages deployment workflow
 ```
 
-## Installation
+## Core functionality
 
-From the project root:
+- Citizen registration, login, profile, emergency contacts, and settings
+- Accident reporting, review, and incident tracking
+- Hospital directory and nearby hospital queries
+- Responder profile, availability, assignment, and status flows
+- Admin user, responder, incident, visibility, and statistics management
+- Notification reads, unread counts, and realtime incident updates
+- GitHub Pages deployment for the frontend static build
+
+## Local development
+
+Install workspace dependencies:
 
 ```bash
 npm install
 ```
 
-The root workspace installs the web and mobile workspace dependencies. No PostgreSQL, backend, or deployment tooling is required for the current frontend scope.
+Start the backend:
 
-## Development commands
+```bash
+cd backend
+npm install
+cp .env.example .env
+npm run dev
+```
 
-Start the web application:
+Start the frontend:
 
 ```bash
 npm run web
 ```
 
-The web app is available at `http://localhost:5173/`.
+The frontend runs at `http://localhost:5173/` and the backend defaults to `http://localhost:5000`.
 
-Build the web application:
+## Backend environment
 
-```bash
-npm run web:build
-```
+Create a backend `.env` from the example file and set secure values for:
 
-Start the mobile workspace foundation:
+- `PORT`
+- `CORS_ORIGIN`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `NODE_ENV`
 
-```bash
-npm run mobile
-```
+Do not commit real secrets or production credentials.
 
-## Current frontend scope
+## Frontend environment
 
-The frontend includes:
-
-- Mock authentication and protected navigation
-- Citizen dashboard and accident-reporting flow
-- Demo incident history, detail, and timelines
-- Demo hospital directory, search, filters, maps, and details
-- Notifications, emergency contacts, profile, and settings UI
-- Mock responder workspace and assignment actions
-- Mock admin dashboard, management views, analytics, audit log, and reports
-- Loading, error, empty, offline/demo, responsive, and accessibility states
-
-## Mock/demo data and limitations
-
-This frontend currently uses mock/demo data where applicable. Local UI changes are held in browser memory or local storage only. It does not replace 112/108 emergency infrastructure, does not perform real emergency dispatch, and does not claim that responders or hospitals are available in real time.
-
-There is no real authentication server, GPS provider, map provider, push-notification service, responder dispatch, hospital capacity feed, audit backend, REST API, database, or production authorization. Frontend role restrictions are presentation-only and are not production authorization.
-
-## Future integration direction
-
-The context and service boundaries are intentionally replaceable:
+The frontend is configured to use a backend URL from the environment variable `VITE_API_BASE_URL` when present. If it is not set, it falls back to the local development backend:
 
 ```text
-UI -> Context/state -> Mock service -> Future REST API -> Backend/database
+http://localhost:5000/api
 ```
 
-Backend, API, database, real authentication, dispatch integrations, and deployment belong to a later phase.
+For deployed or hosted backend environments, set the variable to the live API origin before building or running the app.
 
-## Design source of truth
+## Testing and validation
 
-The supplied Emergency Response Platform design reference defines the visual language. The implementation uses its approved palette, typography hierarchy, spacing, rounded cards, status colors, responsive navigation, and map presentation.
+Backend tests:
+
+```bash
+cd backend
+npm test
+```
+
+Frontend build:
+
+```bash
+npm --workspace web run build
+```
+
+## GitHub Pages deployment
+
+The frontend is deployed to GitHub Pages via the workflow in `.github/workflows/deploy-pages.yml`. The app uses a GitHub Pages-compatible Vite base path and SPA fallback files so nested routes can reload safely in a static hosting environment.
+
+## Important production note
+
+GitHub Pages hosts only the frontend. The backend remains a separate application that must be deployed to an environment with its own infrastructure and database credentials. The project is production-configurable, but it does not claim to have a public production backend without explicit external deployment setup.

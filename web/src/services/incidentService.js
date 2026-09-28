@@ -30,30 +30,23 @@ async function request(path, token, options = {}) {
   return result
 }
 
-export const accidentReportService = {
-  async submit(report, token) {
-    if (!token) {
-      throw new Error('You need to be signed in before submitting an accident report.')
-    }
+export const incidentService = {
+  async listIncidents(token) {
+    return request('/incidents', token)
+  },
 
-    const location = report.location && typeof report.location === 'object'
-      ? { name: report.location.name || 'Location not specified', source: report.location.source || 'Current device location' }
-      : { name: String(report.location || 'Location not specified'), source: 'User-provided location' }
+  async getIncident(token, incidentId) {
+    return request(`/incidents/${encodeURIComponent(incidentId)}`, token)
+  },
 
-    const payload = {
-      accidentType: report.accidentType,
-      peopleInvolved: report.peopleInvolved,
-      injuries: report.injuries,
-      vehicles: report.vehicles,
-      description: report.description?.trim() || '',
-      location,
-    }
+  async getIncidentHistory(token, incidentId) {
+    return request(`/incidents/${encodeURIComponent(incidentId)}/history`, token)
+  },
 
-    const result = await request('/incidents', token, {
+  async createIncident(token, payload) {
+    return request('/incidents', token, {
       method: 'POST',
       body: payload,
     })
-
-    return result.incident
   },
 }
