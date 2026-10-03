@@ -1,9 +1,9 @@
 import { io } from 'socket.io-client'
-
-const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '')
-const socketBase = apiBase.replace(/\/api\/?$/i, '')
+import { getApiBaseUrl, getSocketBaseUrl } from '../config/api'
+import { notifySessionExpired, throwForApiError } from './apiErrors'
 
 async function request(path, token, options = {}) {
+  const apiBase = getApiBaseUrl()
   let response
   try {
     response = await fetch(`${apiBase}${path}`, {
@@ -15,7 +15,7 @@ async function request(path, token, options = {}) {
       },
     })
   } catch {
-    throw new Error('The notification service is unavailable. Check that the backend is running.')
+    throw new Error('Unable to connect to the server. Check your connection.')
   }
 
   let result
@@ -24,7 +24,7 @@ async function request(path, token, options = {}) {
   } catch {
     throw new Error('The notification service returned an unreadable response.')
   }
-  if (!response.ok) throw new Error(result.message || 'The notification request could not be completed.')
+  throwForApiError(response, result, 'The notification request could not be completed.')
   return result
 }
 
@@ -46,7 +46,13 @@ export async function markAllNotificationsRead(token) {
 }
 
 export function connectNotificationSocket(token) {
-  return io(socketBase, {
+  const socket = io(getSocketBaseUrl(), {
     auth: { token },
   })
+  socket.on('connect_error', (error) => {
+    if (/authentication required|invalid or expired token/i.test(error.message)) {
+      notifySessionExpired()
+    }
+  })
+  return socket
 }

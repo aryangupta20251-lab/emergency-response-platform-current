@@ -1,6 +1,8 @@
-const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '')
+import { getApiBaseUrl } from '../config/api'
+import { throwForApiError } from './apiErrors'
 
 async function request(path, token, options = {}) {
+  const apiBase = getApiBaseUrl()
   let response
   try {
     response = await fetch(`${apiBase}${path}`, {
@@ -13,7 +15,7 @@ async function request(path, token, options = {}) {
       body: options.body === undefined ? undefined : typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
     })
   } catch {
-    throw new Error('The incident service is unavailable. Check that the backend is running.')
+    throw new Error('Unable to connect to the server. Check your connection.')
   }
 
   let result
@@ -23,9 +25,7 @@ async function request(path, token, options = {}) {
     throw new Error('The incident service returned an unreadable response.')
   }
 
-  if (!response.ok) {
-    throw new Error(result?.message || 'The incident request could not be completed.')
-  }
+  throwForApiError(response, result, 'The incident request could not be completed.')
 
   return result
 }
@@ -47,6 +47,13 @@ export const incidentService = {
     return request('/incidents', token, {
       method: 'POST',
       body: payload,
+    })
+  },
+
+  async updateStatus(token, incidentId, status) {
+    return request(`/incidents/${encodeURIComponent(incidentId)}/status`, token, {
+      method: 'PATCH',
+      body: { status },
     })
   },
 }

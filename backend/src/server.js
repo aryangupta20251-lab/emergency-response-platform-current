@@ -6,8 +6,8 @@ import { attachRealtime } from "./realtime/socket.js";
 const server = createServer(app);
 attachRealtime(server);
 
-server.listen(env.port, () => {
-  console.log("Emergency Response Platform API listening on http://localhost:" + env.port);
+server.listen(env.port, env.host, () => {
+  console.log("Emergency Response Platform API listening on " + env.host + ":" + env.port);
 });
 
 server.on("error", (error) => {

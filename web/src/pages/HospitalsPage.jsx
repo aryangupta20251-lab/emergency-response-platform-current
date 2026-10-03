@@ -129,7 +129,7 @@ export default function HospitalsPage() {
         <Card className="hospital-map-card">
           <div className="card-heading">
             <div>
-              <span className="muted-label">OpenStreetMap</span>
+              <span className="muted-label">Google Maps</span>
               <h2 className="detail-card-title">{nearbyOnly ? 'Hospitals within 10 km' : 'Hospital locations'}</h2>
             </div>
             <MapPin color="var(--color-primary)" size={20} />
@@ -142,7 +142,7 @@ export default function HospitalsPage() {
             locationState={locationState}
             onRequestLocation={requestUserLocation}
           />
-          <small className="hospital-map-note">OpenStreetMap contributors provide map tiles. Markers use the application directory; emergency availability is not real-time.</small>
+          <small className="hospital-map-note">Markers use the application hospital directory; emergency availability is not real-time.</small>
         </Card>
       </div>
     </div>

@@ -158,7 +158,9 @@ export async function updateUserStatus(request, response) {
 
   const result = await getPool().query(
     `UPDATE users
-     SET account_status = $2, updated_at = CURRENT_TIMESTAMP
+     SET account_status = $2,
+         session_version = session_version + 1,
+         updated_at = CURRENT_TIMESTAMP
      WHERE id = $1 AND id <> $3
      RETURNING id, name, email, phone_number, role, account_status, created_at, updated_at`,
     [id, status, request.user.id],
@@ -189,7 +191,9 @@ export async function updateUserRole(request, response) {
 
   const result = await getPool().query(
     `UPDATE users
-     SET role = $2, updated_at = CURRENT_TIMESTAMP
+     SET role = $2,
+         session_version = session_version + 1,
+         updated_at = CURRENT_TIMESTAMP
      WHERE id = $1
      RETURNING id, name, email, phone_number, role, account_status, created_at, updated_at`,
     [id, role],

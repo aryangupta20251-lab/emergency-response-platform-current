@@ -4,8 +4,8 @@ import { router } from 'expo-router'
 export default function Login() {
   return <View style={styles.container}>
     <Text style={styles.title}>Welcome back</Text>
-    <Text style={styles.description}>Demo navigation for the frontend-only mobile shell.</Text>
-    <Pressable style={styles.button} onPress={() => router.replace('/dashboard')}><Text style={styles.buttonText}>Continue to dashboard</Text></Pressable>
+    <Text style={styles.description}>Sign-in is not connected in this mobile preview. Continuing opens a placeholder dashboard and does not authenticate you.</Text>
+    <Pressable accessibilityRole="button" style={styles.button} onPress={() => router.replace('/dashboard')}><Text style={styles.buttonText}>Continue to preview</Text></Pressable>
   </View>
 }
 

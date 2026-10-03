@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { authService } from '../services/authService'
+import { sessionExpiredEvent } from '../services/apiErrors'
 
 const storageKey = 'emergency-response-user'
 const tokenStorageKey = 'emergency-response-access-token'
 const rememberMeKey = 'emergency-response-remember-me'
+const sessionExpiredNoticeKey = 'emergency-response-session-expired-notice'
 const AuthContext = createContext(null)
 
 function getExpiresAt(token) {
@@ -59,6 +61,16 @@ export function AuthProvider({ children }) {
   const { user, token, rememberMe } = session
 
   useEffect(() => {
+    const handleSessionExpired = () => {
+      clearStoredSession()
+      sessionStorage.setItem(sessionExpiredNoticeKey, 'true')
+      setSession({ user: null, token: null, rememberMe: false })
+    }
+    window.addEventListener(sessionExpiredEvent, handleSessionExpired)
+    return () => window.removeEventListener(sessionExpiredEvent, handleSessionExpired)
+  }, [])
+
+  useEffect(() => {
     if (user && token) {
       const store = getSessionStore(rememberMe)
       const otherStore = rememberMe ? sessionStorage : localStorage
@@ -75,6 +87,7 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials, nextRememberMe = true) => {
     const nextSession = await authService.login(credentials)
+    sessionStorage.removeItem(sessionExpiredNoticeKey)
     setSession({ ...nextSession, rememberMe: nextRememberMe })
     return nextSession.user
   }

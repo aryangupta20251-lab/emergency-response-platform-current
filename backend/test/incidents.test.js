@@ -89,7 +89,9 @@ test("incident APIs validate reports and enforce authenticated ownership", async
       incident({ vehicles: "Spaceship" }),
       incident({ description: "x".repeat(501) }),
       incident({ location: { name: " " } }),
-      incident({ location: { name: "Valid", latitude: 91 } }),
+      incident({ location: { name: "Valid", latitude: 91, longitude: 76 } }),
+      incident({ location: { name: "Valid", latitude: 30 } }),
+      incident({ location: { name: "Valid", latitude: "30", longitude: 76 } }),
       incident({ reporterId: userB.user.id }),
       incident({ status: "resolved" }),
       incident({ latitude: "not-a-number" }),
@@ -184,6 +186,32 @@ test("incident APIs validate reports and enforce authenticated ownership", async
       assert.notEqual(listA.body.incidents[0].id, incidentA.id);
       assert.equal(listA.body.incidents[1].id, incidentA.id);
       assert.equal(listB.body.incidents[0].id, incidentB.id);
+    });
+
+    await context.test("persists map coordinates submitted with a new incident", async () => {
+      const created = await request(baseUrl, "/api/incidents", {
+        method: "POST",
+        token: userA.token,
+        body: incident({
+          location: {
+            name: "Sector 12, Chandigarh",
+            source: "Selected on OpenStreetMap",
+            latitude: 30.7333,
+            longitude: 76.7794,
+          },
+        }),
+      });
+
+      assert.equal(created.status, 201);
+      assert.equal(created.body.incident.latitude, 30.7333);
+      assert.equal(created.body.incident.longitude, 76.7794);
+
+      const stored = await getPool().query(
+        "SELECT latitude, longitude FROM incidents WHERE id = $1",
+        [created.body.incident.id],
+      );
+      assert.equal(stored.rows[0].latitude, 30.7333);
+      assert.equal(stored.rows[0].longitude, 76.7794);
     });
 
     await context.test("retrieves own detail and hides another user's incident", async () => {

@@ -9,7 +9,7 @@
     "db:check": "node src/db/checkConnection.js",
     "db:migrate": "node src/db/runMigrations.js",
     "db:seed:hospitals": "node src/db/seedDevelopmentHospitals.js",
-    "test": "npm run db:migrate && node --test"
+    "test": "node scripts/test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

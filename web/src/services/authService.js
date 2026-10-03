@@ -1,6 +1,7 @@
-const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '')
+import { getApiBaseUrl } from '../config/api'
 
 async function request(path, body) {
+  const apiBase = getApiBaseUrl()
   let response
   try {
     response = await fetch(`${apiBase}${path}`, {
@@ -9,7 +10,7 @@ async function request(path, body) {
       body: JSON.stringify(body),
     })
   } catch {
-    throw new Error('The account service is unavailable. Check that the backend is running.')
+    throw new Error('Unable to connect to the server. Check your connection.')
   }
 
   let result
@@ -18,7 +19,10 @@ async function request(path, body) {
   } catch {
     throw new Error('The account service returned an unreadable response.')
   }
-  if (!response.ok) throw new Error(result.message || 'The account request could not be completed.')
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Invalid email or password.')
+    throw new Error(result.message || 'The account request could not be completed.')
+  }
   return result
 }
 
@@ -49,13 +53,16 @@ export const authService = {
   },
 
   async requestPasswordReset(identifier) {
-    if (!identifier.trim()) throw new Error('Enter the email or phone number linked to your account.')
-    return { identifier: identifier.trim().toLowerCase() }
+    if (typeof identifier !== 'string' || !identifier.trim()) {
+      throw new Error('Enter the email or phone number linked to your account.')
+    }
+    return request('/auth/password-reset/request', { identifier: identifier.trim() })
   },
 
-  async resetPassword({ password, confirmPassword }) {
+  async resetPassword({ token, password, confirmPassword }) {
     if (password.length < 6) throw new Error('Your new password must be at least 6 characters.')
     if (password !== confirmPassword) throw new Error('Passwords do not match.')
-    return true
+    if (!token) throw new Error('Use the password reset link sent for your account.')
+    return request('/auth/password-reset/confirm', { token, password })
   }
 }

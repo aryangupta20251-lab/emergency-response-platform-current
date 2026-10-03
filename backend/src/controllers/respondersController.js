@@ -2,7 +2,9 @@ import {
   createResponderProfile,
   findIncidentResponders,
   findNearbyResponders,
+  getAssignedIncident,
   getResponderProfile,
+  listAssignedIncidents,
   updateResponderAvailability,
   updateResponderLocation,
   updateResponderVerification,
@@ -24,6 +26,20 @@ export async function readMyProfile(request, response) {
     return;
   }
   response.status(200).json({ success: true, responder });
+}
+
+export async function readMyAssignedIncidents(request, response) {
+  const incidents = await listAssignedIncidents(request.user.id);
+  response.status(200).json({ success: true, incidents });
+}
+
+export async function readMyAssignedIncident(request, response) {
+  const assignment = await getAssignedIncident(request.user.id, request.params.id);
+  if (!assignment) {
+    response.status(404).json({ success: false, message: "Assigned incident not found." });
+    return;
+  }
+  response.status(200).json({ success: true, ...assignment });
 }
 
 export async function editMyLocation(request, response) {

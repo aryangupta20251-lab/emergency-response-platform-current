@@ -462,6 +462,24 @@ test("responder privacy, availability, discovery, and assignment are enforced", 
       const assignedOwner = assignedIncidentId === incidentA ? citizenA : citizenB;
       const otherCitizen = assignedIncidentId === incidentA ? citizenB : citizenA;
 
+      const ownAssignments = await request(baseUrl, "/api/responders/me/incidents", { token: responderA.token });
+      const anonymousAssignments = await request(baseUrl, "/api/responders/me/incidents");
+      const otherAssignments = await request(baseUrl, "/api/responders/me/incidents", { token: responderB.token });
+      const ownAssignment = await request(baseUrl, `/api/responders/me/incidents/${assignedIncidentId}`, { token: responderA.token });
+      const otherAssignment = await request(baseUrl, `/api/responders/me/incidents/${assignedIncidentId}`, { token: responderB.token });
+      const citizenAssignments = await request(baseUrl, "/api/responders/me/incidents", { token: citizenA.token });
+      assert.equal(ownAssignments.status, 200);
+      assert.equal(anonymousAssignments.status, 401);
+      assert.ok(ownAssignments.body.incidents.some((incident) => incident.id === assignedIncidentId));
+      assert.equal(otherAssignments.status, 200);
+      assert.equal(otherAssignments.body.incidents.some((incident) => incident.id === assignedIncidentId), false);
+      assert.equal(ownAssignment.status, 200);
+      assert.deepEqual(ownAssignment.body.history.map((item) => item.newStatus), [
+        "reported", "received", "verified", "responder_assigned",
+      ]);
+      assert.equal(otherAssignment.status, 404);
+      assert.equal(citizenAssignments.status, 403);
+
       const wrongResponder = await request(baseUrl, `/api/incidents/${assignedIncidentId}/status`, {
         method: "PATCH",
         token: responderB.token,

@@ -204,6 +204,45 @@ export async function getResponderProfile(userId) {
   return result.rows[0] ? toResponderProfile(result.rows[0]) : null;
 }
 
+export async function listAssignedIncidents(userId) {
+  const result = await getPool().query(
+    `SELECT ${incidentColumns}
+     FROM incidents
+     WHERE assigned_responder_user_id = $1
+     ORDER BY updated_at DESC, id DESC`,
+    [userId],
+  );
+  return result.rows.map(toIncident);
+}
+
+export async function getAssignedIncident(userId, incidentId) {
+  validateUuid(incidentId, "Incident ID");
+  const result = await getPool().query(
+    `SELECT ${incidentColumns}
+     FROM incidents
+     WHERE id = $1 AND assigned_responder_user_id = $2`,
+    [incidentId, userId],
+  );
+  if (!result.rows[0]) return null;
+
+  const historyResult = await getPool().query(
+    `SELECT previous_status, new_status, changed_by_user_id, created_at
+     FROM incident_status_history
+     WHERE incident_id = $1
+     ORDER BY created_at ASC, id ASC`,
+    [incidentId],
+  );
+  return {
+    incident: toIncident(result.rows[0]),
+    history: historyResult.rows.map((row) => ({
+      previousStatus: row.previous_status,
+      newStatus: row.new_status,
+      changedByUserId: row.changed_by_user_id,
+      createdAt: row.created_at,
+    })),
+  };
+}
+
 export async function updateResponderLocation(userId, body) {
   validateObject(body, ["latitude", "longitude"], ["latitude", "longitude"]);
   if (typeof body.latitude !== "number" || typeof body.longitude !== "number") {

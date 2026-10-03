@@ -1,34 +1,14 @@
-import L from 'leaflet'
 import { LocateFixed } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { MapContainer as LeafletMap, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  getGoogleMapsAuthFailure,
+  loadGoogleMaps,
+  subscribeToGoogleMapsAuthFailure,
+} from '../services/googleMapsLoader'
+import { getMapPosition } from '../utils/mapCoordinates'
 
-const defaultCenter = [30.7415, 76.7683]
+const defaultCenter = { lat: 30.7415, lng: 76.7683 }
 const emptyMarkers = []
-
-const markerIcons = {
-  hospital: L.divIcon({
-    className: 'leaflet-marker leaflet-marker--hospital',
-    html: '<span aria-hidden="true">H</span>',
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
-    popupAnchor: [0, -30],
-  }),
-  user: L.divIcon({
-    className: 'leaflet-marker leaflet-marker--user',
-    html: '<span aria-hidden="true"></span>',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  }),
-  incident: L.divIcon({
-    className: 'leaflet-marker leaflet-marker--incident',
-    html: '<span aria-hidden="true">!</span>',
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
-    popupAnchor: [0, -30],
-  }),
-}
 
 const locationMessages = {
   'permission-required': ['Location permission required', 'Use the location control to request browser permission.'],
@@ -37,43 +17,58 @@ const locationMessages = {
   error: ['Could not load location', 'You can still browse the map and hospital list.'],
 }
 
-function getPosition(location) {
-  if (!location || typeof location !== 'object') return null
-  const latitude = Number(location.latitude ?? location.lat)
-  const longitude = Number(location.longitude ?? location.lng ?? location.lon)
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
-    || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return null
+function getMarkerIcon(kind) {
+  const styles = {
+    hospital: { color: '#2563eb', scale: 14 },
+    incident: { color: '#dc2626', scale: 14 },
+    user: { color: '#14b8a6', scale: 9 },
   }
-  return [latitude, longitude]
+  const style = styles[kind]
+  return {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    fillColor: style.color,
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeWeight: 2,
+    scale: style.scale,
+  }
 }
 
-function FitMarkers({ positions, center, zoom }) {
-  const map = useMap()
-  const positionKey = positions.map(([latitude, longitude]) => `${latitude},${longitude}`).join('|')
+function createInfoContent(marker, kind) {
+  const content = document.createElement('div')
+  content.className = 'map-popup'
 
-  useEffect(() => {
-    if (positions.length > 1) {
-      map.fitBounds(positions, { padding: [32, 32], maxZoom: 15 })
-    } else if (positions.length === 1) {
-      map.setView(positions[0], Math.max(map.getZoom(), 14))
-    } else {
-      map.setView(center, zoom)
-    }
-  // positionKey changes only when coordinates change, so user panning is preserved.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center, map, positionKey, zoom])
+  const addText = (tag, text) => {
+    if (text == null || text === '') return
+    const element = document.createElement(tag)
+    element.textContent = String(text)
+    content.append(element)
+  }
 
-  return null
+  if (kind === 'user') {
+    addText('strong', marker.source === 'Browser location permission' ? 'Your current location' : 'Selected incident location')
+    return content
+  }
+
+  addText('strong', marker.name || (kind === 'incident' ? 'Authorized incident location' : 'Location'))
+  if (marker.type) addText('span', marker.type)
+  if (marker.address) addText('span', marker.address)
+  if (marker.distanceKm !== undefined) addText('span', `${Number(marker.distanceKm).toFixed(1)} km straight-line`)
+  if (marker.emergencyAvailable !== undefined) {
+    addText('span', marker.emergencyAvailable ? 'Listed as emergency-capable' : 'Emergency availability not listed')
+  }
+  if (marker.isDemo) addText('small', 'Development sample · availability is not live')
+  return content
 }
 
-function MapPointSelector({ onSelectLocation }) {
-  useMapEvents({
-    click(event) {
-      onSelectLocation?.({ latitude: event.latlng.lat, longitude: event.latlng.lng })
-    },
-  })
-  return null
+function getMapError(error) {
+  if (error?.code === 'GOOGLE_MAPS_KEY_MISSING') {
+    return 'Google Maps is not configured. Set VITE_GOOGLE_MAPS_API_KEY in web/.env.local and restart Vite.'
+  }
+  if (error?.code === 'GOOGLE_MAPS_AUTH_FAILURE') {
+    return 'Google Maps rejected this key. Check its Maps JavaScript API restriction, HTTP referrers, and billing configuration.'
+  }
+  return 'Google Maps could not load. Check your network connection and Google Cloud API-key, referrer, and billing settings.'
 }
 
 export default function MapContainer({
@@ -84,67 +79,185 @@ export default function MapContainer({
   userLocation = null,
   incidentLocation = null,
   onSelectLocation,
-  center = defaultCenter,
+  center = [defaultCenter.lat, defaultCenter.lng],
   zoom = 12,
 }) {
-  const [tileStatus, setTileStatus] = useState('loading')
-  const stateMessage = locationMessages[locationState]
+  const elementRef = useRef(null)
+  const mapRef = useRef(null)
+  const infoWindowRef = useRef(null)
+  const onSelectLocationRef = useRef(onSelectLocation)
+  const [mapLibrary, setMapLibrary] = useState(null)
+  const [mapError, setMapError] = useState('')
+  const [mapReady, setMapReady] = useState(false)
+  const [authFailure, setAuthFailure] = useState(false)
+
   const safeMarkers = useMemo(() => markers
-    .map((marker) => ({ ...marker, position: getPosition(marker) }))
+    .map((marker) => ({ ...marker, position: getMapPosition(marker) }))
     .filter((marker) => marker.position), [markers])
-  const userPosition = getPosition(userLocation)
-  const incidentPosition = getPosition(incidentLocation)
-  const centerPosition = getPosition({ latitude: center[0], longitude: center[1] }) || defaultCenter
+  const invalidMarkerCount = markers.length - safeMarkers.length
+  const userPosition = getMapPosition(userLocation)
+  const incidentPosition = getMapPosition(incidentLocation)
+  const centerPosition = useMemo(
+    () => getMapPosition({ latitude: center?.[0], longitude: center?.[1] }) || defaultCenter,
+    [center?.[0], center?.[1]],
+  )
   const positions = useMemo(() => [
     ...safeMarkers.map((marker) => marker.position),
     ...(userPosition ? [userPosition] : []),
     ...(incidentPosition ? [incidentPosition] : []),
-  ], [incidentPosition?.[0], incidentPosition?.[1], safeMarkers, userPosition?.[0], userPosition?.[1]])
+  ], [incidentPosition?.lat, incidentPosition?.lng, safeMarkers, userPosition?.lat, userPosition?.lng])
+  const positionKey = positions.map(({ lat, lng }) => `${lat},${lng}`).join('|')
+  const stateMessage = locationMessages[locationState]
+
+  useEffect(() => {
+    onSelectLocationRef.current = onSelectLocation
+  }, [onSelectLocation])
+
+  useEffect(() => {
+    let active = true
+    const unsubscribe = subscribeToGoogleMapsAuthFailure(() => {
+      if (active) {
+        setAuthFailure(true)
+        setMapError(getMapError({ code: 'GOOGLE_MAPS_AUTH_FAILURE' }))
+      }
+    })
+
+    loadGoogleMaps()
+      .then((library) => {
+        if (!active) return
+        if (getGoogleMapsAuthFailure()) {
+          setAuthFailure(true)
+          setMapError(getMapError({ code: 'GOOGLE_MAPS_AUTH_FAILURE' }))
+          return
+        }
+        setMapLibrary(library)
+      })
+      .catch((error) => {
+        if (active) setMapError(getMapError(error))
+      })
+
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mapLibrary || !elementRef.current || authFailure) return undefined
+
+    const map = new mapLibrary.Map(elementRef.current, {
+      center: defaultCenter,
+      zoom: 12,
+      clickableIcons: false,
+      gestureHandling: 'cooperative',
+      scrollwheel: false,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    })
+    const infoWindow = new mapLibrary.InfoWindow()
+    const clickListener = map.addListener('click', (event) => {
+      if (event.latLng && onSelectLocationRef.current) {
+        onSelectLocationRef.current({
+          latitude: event.latLng.lat(),
+          longitude: event.latLng.lng(),
+        })
+      }
+    })
+
+    mapRef.current = map
+    infoWindowRef.current = infoWindow
+    setMapReady(true)
+
+    return () => {
+      clickListener.remove()
+      infoWindow.close()
+      mapRef.current = null
+      infoWindowRef.current = null
+    }
+  }, [authFailure, mapLibrary])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    if (positions.length > 1) {
+      const bounds = new window.google.maps.LatLngBounds()
+      positions.forEach((position) => bounds.extend(position))
+      map.fitBounds(bounds, 32)
+    } else if (positions.length === 1) {
+      map.setCenter(positions[0])
+      map.setZoom(Math.max(map.getZoom() || zoom, 14))
+    } else {
+      map.setCenter(centerPosition)
+      map.setZoom(zoom)
+    }
+  }, [centerPosition, mapLibrary, mapReady, positionKey, positions, zoom])
+
+  useEffect(() => {
+    mapRef.current?.setOptions({
+      gestureHandling: interactive ? 'greedy' : 'cooperative',
+      scrollwheel: interactive,
+    })
+  }, [interactive, mapReady])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const infoWindow = infoWindowRef.current
+    if (!map || !infoWindow || !mapReady || authFailure) return undefined
+
+    const activeMarkers = []
+    const addMarker = (marker, kind) => {
+      const instance = new window.google.maps.Marker({
+        map,
+        position: marker.position,
+        title: marker.name || (kind === 'incident' ? 'Incident location' : 'Current location'),
+        icon: getMarkerIcon(kind),
+        ...(kind === 'hospital' || kind === 'incident'
+          ? { label: { text: kind === 'hospital' ? 'H' : '!', color: '#ffffff', fontWeight: '700' } }
+          : {}),
+      })
+      const listener = instance.addListener('click', () => {
+        infoWindow.setContent(createInfoContent(marker, kind))
+        infoWindow.open({ map, anchor: instance })
+      })
+      activeMarkers.push({ instance, listener })
+    }
+
+    safeMarkers.forEach((marker) => addMarker(marker, 'hospital'))
+    if (userPosition) addMarker({ ...userLocation, position: userPosition }, 'user')
+    if (incidentPosition) addMarker({ ...incidentLocation, position: incidentPosition }, 'incident')
+
+    return () => {
+      activeMarkers.forEach(({ instance, listener }) => {
+        listener.remove()
+        instance.setMap(null)
+      })
+      infoWindow.close()
+    }
+  }, [
+    incidentLocation?.name,
+    incidentPosition?.lat,
+    incidentPosition?.lng,
+    mapLibrary,
+    mapReady,
+    authFailure,
+    safeMarkers,
+    userLocation?.source,
+    userPosition?.lat,
+    userPosition?.lng,
+  ])
+
+  const errorText = mapError || (authFailure ? getMapError({ code: 'GOOGLE_MAPS_AUTH_FAILURE' }) : '')
 
   return (
-    <div className={`real-map ${interactive ? 'real-map--interactive' : ''}`} aria-label="OpenStreetMap">
-      <LeafletMap center={centerPosition} zoom={zoom} scrollWheelZoom={interactive} className="real-map__canvas">
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          eventHandlers={{
-            load: () => setTileStatus('loaded'),
-            tileerror: () => setTileStatus((current) => current === 'loaded' ? current : 'error'),
-          }}
-        />
-        <FitMarkers positions={positions} center={centerPosition} zoom={zoom} />
-        {onSelectLocation && <MapPointSelector onSelectLocation={onSelectLocation} />}
-        {safeMarkers.map((marker) => (
-          <Marker key={marker.id} position={marker.position} icon={markerIcons.hospital}>
-            <Popup>
-              <div className="map-popup">
-                <strong>{marker.name}</strong>
-                {marker.type && <span>{marker.type}</span>}
-                {marker.address && <span>{marker.address}</span>}
-                {marker.distanceKm !== undefined && <span>{Number(marker.distanceKm).toFixed(1)} km straight-line</span>}
-                {marker.emergencyAvailable !== undefined && (
-                  <span>{marker.emergencyAvailable ? 'Listed as emergency-capable' : 'Emergency availability not listed'}</span>
-                )}
-                {marker.isDemo && <small>Development sample · availability is not live</small>}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-        {userPosition && (
-          <Marker position={userPosition} icon={markerIcons.user}>
-            <Popup>{userLocation.source === 'Browser location permission' ? 'Your current location' : 'Selected incident location'}</Popup>
-          </Marker>
-        )}
-        {incidentPosition && (
-          <Marker position={incidentPosition} icon={markerIcons.incident}>
-            <Popup>{incidentLocation.name || 'Authorized incident location'}</Popup>
-          </Marker>
-        )}
-      </LeafletMap>
-      {tileStatus === 'loading' && <div className="real-map__notice" role="status">Loading OpenStreetMap…</div>}
-      {tileStatus === 'error' && (
-        <div className="real-map__notice real-map__notice--error" role="status">
-          Map tiles are temporarily unavailable. You can still use the hospital list.
+    <div className={`real-map ${interactive ? 'real-map--interactive' : ''}`} role="region" aria-label="Google Map">
+      <div ref={elementRef} className="real-map__canvas" />
+      {!errorText && !mapReady && <div className="real-map__notice" role="status">Loading Google Maps…</div>}
+      {errorText && <div className="real-map__notice real-map__notice--error" role="alert">{errorText}</div>}
+      {invalidMarkerCount > 0 && !errorText && (
+        <div className="real-map__notice real-map__notice--warning" role="status">
+          {invalidMarkerCount} location{invalidMarkerCount === 1 ? '' : 's'} could not be shown because coordinates are missing or invalid.
         </div>
       )}
       {onRequestLocation && (

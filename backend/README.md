@@ -18,12 +18,38 @@ Copy-Item .env.example .env
 
 Start the development server with npm run dev.
 
-The API listens on http://localhost:5000 by default. Set PORT in .env to use another port.
+The API listens on port 5000 by default. In development it binds to `0.0.0.0`
+so a trusted device on the same LAN can reach it; production defaults to
+`127.0.0.1`. On the PC, use `http://localhost:5000`. Set `PORT` in `.env` to
+use another port. Keep development ports behind the private-network firewall;
+do not expose them to the public internet.
+
+`HOST` overrides the bind address. A production reverse-proxy or container
+deployment that requires an external interface must set `HOST=0.0.0.0`
+explicitly and restrict inbound access at the hosting firewall/proxy.
+
+`CORS_ORIGIN` is a comma-separated allowlist of frontend origins. By default it
+allows only `http://localhost:5173` and `http://127.0.0.1:5173`. For phone
+testing, add `http://<PC-LAN-IP>:5173` to the local ignored `.env` and restart
+the API. Wildcard origins are rejected.
 
 ## Available endpoints
 
 - GET /api — confirms that the API foundation is available.
 - GET /api/health — confirms that the API and PostgreSQL connection are responding.
+- POST /api/auth/password-reset/request — requests reset delivery without revealing whether an account exists.
+- POST /api/auth/password-reset/confirm — changes the password with a single-use, 30-minute token.
+
+Password reset tokens are stored as SHA-256 hashes. Local development defaults
+to a link printed in the backend terminal; this is a development-only delivery
+sink, not email or SMS. Production must configure `PASSWORD_RESET_DELIVERY=webhook`,
+`PASSWORD_RESET_URL`, `PASSWORD_RESET_WEBHOOK_URL`, and
+`PASSWORD_RESET_WEBHOOK_TOKEN`. The configured HTTPS webhook receives a JSON
+payload containing `recipient`, `resetUrl`, and `expiresAt`, authenticated by
+the bearer token, and is responsible for private delivery. No email/SMS
+provider is bundled. If delivery is disabled or unavailable, the request
+returns an explicit service error rather than claiming that instructions were
+sent.
 
 ### Hospitals
 
@@ -52,7 +78,11 @@ or citizen endpoint can self-verify an account.
 
 Responders can use `GET /api/responders/me`,
 `PATCH /api/responders/me/location`, and
-`PATCH /api/responders/me/availability`. Nearby discovery is admin-only at
+`PATCH /api/responders/me/availability`. Their assigned incident list and
+assignment-scoped detail/history are available from
+`GET /api/responders/me/incidents` and
+`GET /api/responders/me/incidents/:id`; other responders cannot read those
+records through these endpoints. Nearby discovery is admin-only at
 `GET /api/responders/nearby` and
 `GET /api/incidents/:id/responders`; its radius defaults to 10 km and is capped
 at 50 km. Distances are approximate straight-line kilometers. Exact responder
@@ -91,3 +121,18 @@ reconnects. No push, SMS, or email transport is configured.
 .env.example lists safe configuration names. Database access and authentication
 use the existing environment configuration; never put real secrets in the
 example file. The local `.env` remains ignored by Git.
+
+## Tests
+
+Backend tests write temporary records to PostgreSQL. Configure
+`TEST_DATABASE_URL` in the ignored `.env` to a separate disposable database
+whose database name includes `test` (for example, `emergency_response_test`).
+`npm test` migrates only this database and will not fall back to
+`DATABASE_URL`. Never use a production database or a database containing data
+you need. The tests remove their generated rows during teardown.
+
+## LAN development
+
+For full PC/phone instructions, including Vite's LAN binding, the API URL,
+CORS allowlist, and Windows Firewall guidance, see the main project README's
+"Run the Web App on Your Phone" section.

@@ -1,20 +1,59 @@
-import { Activity, AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Hospital, ShieldCheck, UsersRound } from 'lucide-react'
+import { Activity, ClipboardList, ShieldCheck, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Alert from '../components/Alert'
 import Card from '../components/Card'
-import Skeleton from '../components/Skeleton'
-import OfflineNotice from '../components/OfflineNotice'
-import { adminActivity, adminStats, incidentStatusSummary, responderSummary, systemSummary } from '../data/adminData'
+import { useAuth } from '../context/AuthContext'
+import { adminService } from '../services/adminService'
+
+const statisticCards = [
+  ['Users', 'users', UsersRound],
+  ['Active incidents', 'activeIncidents', Activity],
+  ['Incidents today', 'incidentsToday', ClipboardList],
+  ['Incidents this week', 'incidentsThisWeek', ClipboardList],
+  ['Verified responders', 'verifiedResponders', ShieldCheck],
+  ['Available responders', 'availableResponders', UsersRound],
+  ['Resolved incidents', 'resolvedIncidents', ClipboardList],
+  ['Responder accounts', 'responders', UsersRound],
+]
 
 export default function AdminDashboardPage() {
+  const { token } = useAuth()
+  const [statistics, setStatistics] = useState(null)
   const [loading, setLoading] = useState(true)
-  useEffect(() => { const timer = window.setTimeout(() => setLoading(false), 500); return () => window.clearTimeout(timer) }, [])
-  if (loading) return <div className="page-content admin-page"><div className="admin-loading"><Skeleton className="skeleton--title" /><Skeleton className="skeleton--line" /><div className="skeleton-grid">{[1, 2, 3, 4].map((item) => <Skeleton className="skeleton--card" key={item} />)}</div><p>Preparing demo operations data...</p></div></div>
-  return <div className="page-content admin-page"><div className="page-header"><div><span className="eyebrow"><ShieldCheck size={14} /> Admin overview</span><h1 className="page-title">Control center</h1><p className="page-subtitle">A read-only overview of the simulated response platform.</p></div></div><Alert tone="info" title="Demo admin dashboard">All statistics, responder states, hospital counts, and activity are mock data. No real authorization or operations backend is connected.</Alert><OfflineNotice>Live operations are unavailable in this frontend demo; showing sample data.</OfflineNotice><div className="admin-stat-grid">{adminStats.map((stat) => <StatCard stat={stat} key={stat.label} />)}</div><div className="admin-dashboard-grid"><Card className="admin-panel admin-panel--status"><PanelHeading icon={Activity} label="Incident overview" title="Status distribution" link="/incidents" linkLabel="View incidents" /><div className="status-bars">{incidentStatusSummary.map((item) => <div className="status-bar" key={item.status}><div><span>{item.status}</span><strong>{item.count}</strong></div><div className="status-bar__track"><span className={`status-bar__fill status-bar__fill--${item.status.toLowerCase().replaceAll(' ', '-')}`} style={{ width: `${Math.max(item.count * 9, 7)}%` }} /></div></div>)}</div></Card><Card className="admin-panel admin-panel--responders"><PanelHeading icon={UsersRound} label="Responder overview" title="Team availability" link="/responder" linkLabel="Open responder view" /><div className="responder-summary-list">{responderSummary.map((item) => <div className="responder-summary-row" key={item.status}><span className={`status-dot status-dot--${item.status === 'Available' ? 'success' : item.status === 'Busy' ? 'warning' : item.status === 'Unavailable' ? 'emergency' : 'info'}`} /><span>{item.status}</span><strong>{item.count}</strong></div>)}</div><div className="admin-total"><span>Total demo profiles</span><strong>{systemSummary.responderProfiles}</strong></div></Card><Card className="admin-panel admin-panel--activity"><PanelHeading icon={ClipboardList} label="Recent activity" title="Latest demo updates" link="/notifications" linkLabel="View activity" />{adminActivity.length ? <div className="admin-activity-list">{adminActivity.map((item) => <div className="admin-activity-row" key={item.title}><span className={`admin-activity-icon admin-activity-icon--${item.tone}`}><Activity size={16} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><time>{item.time}</time></div>)}</div> : <AdminEmpty text="No recent activity" />}</Card><Card className="admin-panel admin-panel--system"><PanelHeading icon={Hospital} label="Hospital and system overview" title="Platform resources" link="/hospitals" linkLabel="Open hospitals" /><div className="system-summary-grid"><SystemMetric icon={Hospital} label="Demo hospitals" value={systemSummary.hospitals} /><SystemMetric icon={UsersRound} label="Responder profiles" value={systemSummary.responderProfiles} /><SystemMetric icon={CheckCircle2} label="Environment" value={systemSummary.demoEnvironment} /></div><div className="admin-system-note"><AlertTriangle size={16} /> Live capacity and system health are not connected.</div></Card></div></div>
-}
+  const [error, setError] = useState('')
 
-function StatCard({ stat }) { return <Card className={`admin-stat-card admin-stat-card--${stat.tone}`}><span>{stat.label}</span><strong>{stat.value}</strong><small>{stat.detail}</small></Card> }
-function PanelHeading({ icon: Icon, label, title, link, linkLabel }) { return <div className="admin-panel-heading"><div><span className="muted-label"><Icon size={14} /> {label}</span><h2>{title}</h2></div>{link && <Link className="text-link" to={link}>{linkLabel} <ArrowRight size={14} /></Link>}</div> }
-function SystemMetric({ icon: Icon, label, value }) { return <div className="system-metric"><Icon size={18} /><span><small>{label}</small><strong>{value}</strong></span></div> }
-function AdminEmpty({ text }) { return <div className="admin-empty"><CheckCircle2 size={21} /><span>{text}</span></div> }
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    adminService.getStatistics(token)
+      .then((result) => { if (active) setStatistics(result) })
+      .catch((loadError) => { if (active) setError(loadError.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [token])
+
+  return (
+    <div className="page-content admin-page">
+      <div className="page-header"><div><span className="eyebrow"><ShieldCheck size={14} /> Admin overview</span><h1 className="page-title">Control center</h1><p className="page-subtitle">Current database aggregates from the backend.</p></div></div>
+      {error && <Alert tone="error" title="Statistics unavailable">{error}</Alert>}
+      <Alert tone="info" title="Coordination platform only">These counts describe records in this platform. They do not represent external dispatch or guaranteed responder availability.</Alert>
+      {loading ? <Card role="status">Loading platform statistics…</Card> : statistics && (
+        <div className="admin-stat-grid">
+          {statisticCards.map(([label, key, Icon]) => (
+            <Card className="admin-stat-card" key={key}>
+              <Icon size={18} /><span>{label}</span><strong>{statistics[key]}</strong>
+            </Card>
+          ))}
+        </div>
+      )}
+      {!loading && !error && !statistics && <Card>No statistics are available.</Card>}
+      <div className="report-actions">
+        <Link className="btn btn--secondary" to="/admin/incidents">Review incidents</Link>
+        <Link className="btn btn--secondary" to="/admin/responders">Review responders</Link>
+        <Link className="btn btn--secondary" to="/admin/users">Manage accounts</Link>
+      </div>
+    </div>
+  )
+}

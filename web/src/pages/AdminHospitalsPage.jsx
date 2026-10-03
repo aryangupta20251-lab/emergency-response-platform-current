@@ -1,17 +1,36 @@
-import { Edit3, Hospital, MapPin, Search, Trash2 } from 'lucide-react'
+import { Hospital, MapPin, Search } from 'lucide-react'
 import { useState } from 'react'
-import AdminConfirmDialog from '../components/AdminConfirmDialog'
 import Alert from '../components/Alert'
-import Button from '../components/Button'
 import Card from '../components/Card'
 import { useAdminManagement } from '../context/AdminManagementContext'
-import { hospitalTypes } from '../data/hospitalData'
 
 export default function AdminHospitalsPage() {
-  const { hospitals, updateHospital, removeHospital } = useAdminManagement(); const [query, setQuery] = useState(''); const [type, setType] = useState('All types'); const [selectedId, setSelectedId] = useState(hospitals[0]?.id); const [editing, setEditing] = useState(false); const [confirm, setConfirm] = useState(false); const [saving, setSaving] = useState(false); const [error, setError] = useState(''); const filtered = hospitals.filter((item) => `${item.name} ${item.address} ${item.type}`.toLowerCase().includes(query.toLowerCase()) && (type === 'All types' || item.type === type)); const selected = hospitals.find((item) => item.id === selectedId)
-  const save = async (event) => { event.preventDefault(); setSaving(true); setError(''); try { const form = new FormData(event.currentTarget); await updateHospital(selected.id, { name: form.get('name'), type: form.get('type'), address: form.get('address') }); setEditing(false) } catch { setError('Could not update this demo hospital.') } finally { setSaving(false) } }; const remove = async () => { setSaving(true); try { await removeHospital(selected.id); setConfirm(false); setSelectedId(hospitals.find((item) => item.id !== selected.id)?.id) } catch { setError('Could not remove this demo hospital.') } finally { setSaving(false) } }
-  return <div className="page-content admin-management-page"><AdminManagementHeader icon={Hospital} title="Hospital management" subtitle="Maintain the demo hospital directory and map records." /><Alert tone="info" title="Mock hospital administration">Hospital records are sample entries. Capacity, availability, and operating status are not connected.</Alert><div className="management-toolbar"><label className="incident-search"><Search size={17} /><span className="sr-only">Search hospitals</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search hospital or location" /></label><select value={type} onChange={(event) => setType(event.target.value)} aria-label="Filter hospitals by type"><option>All types</option>{hospitalTypes.map((item) => <option key={item}>{item}</option>)}</select></div><div className="management-grid"><Card className="management-list">{filtered.length ? filtered.map((item) => <button className={`management-list-row ${selectedId === item.id ? 'management-list-row--active' : ''}`} type="button" key={item.id} onClick={() => { setSelectedId(item.id); setEditing(false) }}><span className="management-avatar"><Hospital size={17} /></span><span><strong>{item.name}</strong><small>{item.type} · {item.address}</small></span><span className="hospital-type">{item.status}</span></button>) : <AdminEmpty text="No hospitals found" />}</Card>{selected && <Card className="management-detail"><div className="management-detail-heading"><div><span className="muted-label">Hospital detail</span><h2>{selected.name}</h2></div><span className="hospital-type">{selected.status}</span></div>{error && <Alert tone="error" title="Action failed">{error}</Alert>}{editing ? <form className="admin-edit-form" onSubmit={save}><label className="field"><span>Name</span><input name="name" defaultValue={selected.name} required /></label><label className="field"><span>Type</span><select name="type" defaultValue={selected.type}>{hospitalTypes.map((item) => <option key={item}>{item}</option>)}</select></label><label className="field"><span>Address</span><input name="address" defaultValue={selected.address} required /></label><div className="report-actions"><Button variant="ghost" type="button" onClick={() => setEditing(false)}>Cancel</Button><Button loading={saving} type="submit">Save hospital</Button></div></form> : <><div className="management-facts"><span><small>Location</small><strong>{selected.address}</strong></span><span><small>Distance</small><strong>{selected.distance}</strong></span><span><small>Contact</small><strong>{selected.phone}</strong></span></div><div className="management-actions"><Button variant="secondary" onClick={() => setEditing(true)}><Edit3 size={15} /> Edit</Button><Button variant="danger" onClick={() => setConfirm(true)}><Trash2 size={15} /> Remove</Button></div></>}</Card>}</div>{confirm && <AdminConfirmDialog title="Remove hospital listing?" message={`Remove ${selected?.name || 'this hospital'} from the demo directory?`} confirmLabel="Remove hospital" loading={saving} onCancel={() => setConfirm(false)} onConfirm={remove} />}</div>
-}
+  const { hospitals, loading, error } = useAdminManagement()
+  const [query, setQuery] = useState('')
+  const filtered = hospitals.filter((item) =>
+    `${item.name} ${item.address} ${item.type}`.toLowerCase().includes(query.toLowerCase()))
 
-function AdminManagementHeader({ icon: Icon, title, subtitle }) { return <div className="page-header"><div><span className="eyebrow"><Icon size={14} /> Admin management</span><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div></div> }
-function AdminEmpty({ text }) { return <div className="admin-empty"><MapPin size={20} /><span>{text}</span></div> }
+  return (
+    <div className="page-content admin-management-page">
+      <div className="page-header"><div><span className="eyebrow"><Hospital size={14} /> Admin directory</span><h1 className="page-title">Hospital directory</h1><p className="page-subtitle">Read-only view of hospital records provided by the backend directory.</p></div></div>
+      <Alert tone="info" title="Directory records only">No hospital create/edit API is available. Emergency availability is stored directory data, not live capacity or acceptance.</Alert>
+      {error && <Alert tone="error" title="Could not load hospital records">{error}</Alert>}
+      <Card className="management-toolbar"><label className="incident-search"><Search size={17} /><span className="sr-only">Search hospitals</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search hospital or location" /></label></Card>
+      {loading ? <Card role="status">Loading hospital directory…</Card> : filtered.length ? (
+        <div className="hospital-list">
+          {filtered.map((item) => (
+            <Card className="hospital-card" key={item.id}>
+              <div className="hospital-card__icon"><Hospital size={21} /></div>
+              <div className="hospital-card__body">
+                <div className="hospital-card__top"><span className="hospital-type">{item.type}</span><strong>{item.isDemo ? 'Development sample' : 'Directory record'}</strong></div>
+                <h2>{item.name}</h2><p>{item.address}</p>
+                <small><MapPin size={13} /> {Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${item.latitude}, ${item.longitude}` : 'Coordinates not available'}</small>
+                <small>Emergency flag: {item.emergencyAvailable ? 'listed' : 'not listed'}; availability is not live</small>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : <Card className="incident-empty-page"><h2>{error ? 'Directory unavailable' : 'No hospital records found'}</h2></Card>}
+    </div>
+  )
+}

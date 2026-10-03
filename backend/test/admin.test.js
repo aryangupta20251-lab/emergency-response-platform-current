@@ -7,6 +7,7 @@ import { closeDatabasePool, getPool } from "../src/db/pool.js";
 const testPassword = "Admin-Tests-2026!";
 let server;
 let baseUrl;
+const createdUserIds = [];
 
 async function request(path, { method = "GET", body, token } = {}) {
   const headers = {};
@@ -34,11 +35,19 @@ async function createUser(label, role = "citizen") {
   });
   assert.equal(login.status, 200, `login failed for ${label}`);
   const user = login.body.user;
+  createdUserIds.push(user.id);
+  let token = login.body.token;
   if (role !== "citizen") {
     await getPool().query("UPDATE users SET role = $2 WHERE id = $1", [user.id, role]);
     user.role = role;
+    const roleLogin = await request("/api/auth/login", {
+      method: "POST",
+      body: { identifier, password: testPassword },
+    });
+    assert.equal(roleLogin.status, 200, `role login failed for ${label}`);
+    token = roleLogin.body.token;
   }
-  return { user, token: login.body.token };
+  return { user, token };
 }
 
 before(async () => {
@@ -51,10 +60,22 @@ before(async () => {
 });
 
 after(async () => {
-  if (server?.listening) {
-    await new Promise((resolve) => server.close(resolve));
+  try {
+    if (server?.listening) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    if (createdUserIds.length > 0) {
+      await getPool().query(
+        `DELETE FROM incidents
+         WHERE reporter_id = ANY($1::uuid[])
+            OR assigned_responder_user_id = ANY($1::uuid[])`,
+        [createdUserIds],
+      );
+      await getPool().query("DELETE FROM users WHERE id = ANY($1::uuid[])", [createdUserIds]);
+    }
+  } finally {
+    await closeDatabasePool();
   }
-  await closeDatabasePool();
 });
 
 test("admin authorization and management APIs are enforced", async (context) => {

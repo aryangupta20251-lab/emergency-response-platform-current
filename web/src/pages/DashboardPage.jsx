@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { dashboardData } from '../data/dashboardData'
 
 const quickActions = [
-  { to: '/report-accident', title: 'Report accident', detail: 'Start a guided demo report', icon: ShieldAlert, tone: 'emergency' },
+  { to: '/report-accident', title: 'Report accident', detail: 'Submit a platform incident report', icon: ShieldAlert, tone: 'emergency' },
   { to: '/hospitals', title: 'Find hospitals', detail: 'View nearby emergency care', icon: Hospital, tone: 'primary' },
   { to: '/emergency-contacts', title: 'Emergency contacts', detail: 'Keep trusted people ready', icon: Phone, tone: 'secondary' }
 ]

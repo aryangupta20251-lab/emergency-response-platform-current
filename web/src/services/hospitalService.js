@@ -1,7 +1,13 @@
-const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '')
+import { getApiBaseUrl } from '../config/api'
 
 async function request(path) {
-  const response = await fetch(`${apiBase}${path}`)
+  const apiBase = getApiBaseUrl()
+  let response
+  try {
+    response = await fetch(`${apiBase}${path}`)
+  } catch {
+    throw new Error('Unable to connect to the server. Check your connection.')
+  }
   let data
 
   try {

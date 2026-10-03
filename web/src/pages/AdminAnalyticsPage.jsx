@@ -1,13 +1,46 @@
-import { Activity, BarChart3, ClipboardList, TrendingUp, UsersRound } from 'lucide-react'
+import { Activity, BarChart3, ClipboardList, UsersRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import Alert from '../components/Alert'
 import Card from '../components/Card'
-import { analyticsResponderSummary, analyticsStatusSummary, incidentTrend } from '../data/adminAnalyticsData'
+import { useAuth } from '../context/AuthContext'
+import { adminService } from '../services/adminService'
+
+const availableMetrics = [
+  ['Incident records created today', 'incidentsToday', ClipboardList],
+  ['Incident records created this week', 'incidentsThisWeek', Activity],
+  ['Active incidents', 'activeIncidents', ClipboardList],
+  ['Resolved incidents', 'resolvedIncidents', ClipboardList],
+  ['Responder accounts', 'responders', UsersRound],
+  ['Verified responder profiles', 'verifiedResponders', UsersRound],
+  ['Available verified responders', 'availableResponders', UsersRound],
+]
 
 export default function AdminAnalyticsPage() {
-  const maxTrend = Math.max(...incidentTrend.map((item) => item.incidents))
-  const maxStatus = Math.max(...analyticsStatusSummary.map((item) => item.count))
-  return <div className="page-content admin-page analytics-page"><div className="page-header"><div><span className="eyebrow"><BarChart3 size={14} /> Admin analytics</span><h1 className="page-title">Platform analytics</h1><p className="page-subtitle">Readable trends and summaries for the simulated response platform.</p></div></div><Alert tone="info" title="Demo analytics">These charts use sample values for interface testing. They are not production statistics or live operational measurements.</Alert><div className="analytics-stat-grid"><AnalyticsStat icon={ClipboardList} label="7-day incidents" value="63" detail="Sample count" /><AnalyticsStat icon={TrendingUp} label="Resolution rate" value="71%" detail="Demo calculation" /><AnalyticsStat icon={UsersRound} label="Active responders" value="16" detail="Sample availability" /><AnalyticsStat icon={Activity} label="Avg. response" value="12 min" detail="Simulated activity" /></div><div className="analytics-grid"><Card className="analytics-panel analytics-panel--trend"><AnalyticsHeading icon={TrendingUp} label="Incident counts" title="Seven-day trend" /><div className="trend-chart" role="img" aria-label="Demo incident trend chart">{incidentTrend.map((item) => <div className="trend-column" key={item.label}><div className="trend-bars"><span className="trend-bar trend-bar--incidents" style={{ height: `${(item.incidents / maxTrend) * 100}%` }} title={`${item.incidents} incidents`} /><span className="trend-bar trend-bar--resolved" style={{ height: `${(item.resolved / maxTrend) * 100}%` }} title={`${item.resolved} resolved`} /></div><small>{item.label}</small></div>)}</div><div className="chart-legend"><span><i className="legend-swatch legend-swatch--incidents" /> Incidents</span><span><i className="legend-swatch legend-swatch--resolved" /> Resolved</span></div></Card><Card className="analytics-panel"><AnalyticsHeading icon={ClipboardList} label="Incident statistics" title="Status distribution" /><div className="analytics-bars">{analyticsStatusSummary.map((item) => <div className="analytics-bar-row" key={item.status}><span>{item.status}</span><div><i style={{ width: `${Math.max((item.count / maxStatus) * 100, 5)}%` }} /></div><strong>{item.count}</strong></div>)}</div></Card><Card className="analytics-panel analytics-panel--wide"><AnalyticsHeading icon={UsersRound} label="Responder statistics" title="Activity by availability" /><div className="responder-analytics-table"><div className="responder-analytics-header"><span>Status</span><span>Profiles</span><span>Activity events</span><span>Avg. response</span></div>{analyticsResponderSummary.map((item) => <div className="responder-analytics-row" key={item.status}><span><i className={`status-dot status-dot--${item.status === 'Available' ? 'success' : item.status === 'Busy' ? 'warning' : item.status === 'Unavailable' ? 'emergency' : 'info'}`} />{item.status}</span><strong>{item.count}</strong><strong>{item.activity}</strong><span>{item.responseMinutes ? `${item.responseMinutes} min` : 'No activity'}</span></div>)}</div></Card></div></div>
-}
+  const { token } = useAuth()
+  const [statistics, setStatistics] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-function AnalyticsStat({ icon: Icon, label, value, detail }) { return <Card className="analytics-stat"><Icon size={18} /><span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span></Card> }
-function AnalyticsHeading({ icon: Icon, label, title }) { return <div className="analytics-heading"><div><span className="muted-label"><Icon size={14} /> {label}</span><h2>{title}</h2></div></div> }
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    adminService.getStatistics(token)
+      .then((result) => { if (active) setStatistics(result) })
+      .catch((loadError) => { if (active) setError(loadError.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [token])
+
+  return (
+    <div className="page-content admin-page analytics-page">
+      <div className="page-header"><div><span className="eyebrow"><BarChart3 size={14} /> Admin analytics</span><h1 className="page-title">Platform metrics</h1><p className="page-subtitle">Only aggregates provided by the backend are shown.</p></div></div>
+      <Alert tone="info" title="Available metrics only">The current API does not provide incident-by-type, hospital-count, notification-activity, response-time, or historical trend aggregations. Those charts are intentionally omitted.</Alert>
+      {error && <Alert tone="error" title="Metrics unavailable">{error}</Alert>}
+      {loading ? <Card role="status">Loading platform metrics…</Card> : statistics ? (
+        <div className="analytics-stat-grid">
+          {availableMetrics.map(([label, key, Icon]) => <Card className="analytics-stat" key={key}><Icon size={18} /><span><small>{label}</small><strong>{statistics[key]}</strong><em>Database aggregate</em></span></Card>)}
+        </div>
+      ) : !error && <Card>No analytics are available.</Card>}
+    </div>
+  )
+}

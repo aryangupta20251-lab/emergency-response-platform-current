@@ -468,18 +468,10 @@ html[data-theme='dark'] .landing-hero {
 .report-card > .real-map { height: 300px; }
 .real-map { position: relative; width: 100%; height: 340px; min-height: 260px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 14px; background: #e9f1e9; }
 .real-map__canvas { width: 100%; height: 100%; background: #e9f1e9; font: inherit; }
-.real-map__canvas .leaflet-control-attribution { font-size: 9px; }
-.real-map__canvas .leaflet-popup-content-wrapper { border-radius: 9px; }
-.real-map__canvas .leaflet-popup-content { margin: 10px 12px; }
-.leaflet-marker { display: grid; place-items: center; border: 2px solid white !important; border-radius: 50% 50% 50% 4px !important; transform: rotate(-45deg); box-shadow: 0 2px 8px rgba(31,41,55,.28); }
-.leaflet-marker span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; color: white; font-family: inherit; font-size: 14px; font-weight: 700; line-height: 1; transform: rotate(45deg); }
-.leaflet-marker--hospital { background: var(--color-primary); }
-.leaflet-marker--user { border-radius: 50% !important; background: rgba(20,184,166,.24); box-shadow: 0 0 0 5px rgba(20,184,166,.18); transform: none; }
-.leaflet-marker--user span { width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; background: var(--color-secondary); }
-.leaflet-marker--incident { background: var(--color-emergency); }
 .real-map__notice, .real-map__location-notice { position: absolute; z-index: 500; display: grid; gap: 4px; max-width: min(320px, calc(100% - 24px)); padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 9px; color: var(--color-dark); background: rgba(255,255,255,.96); box-shadow: 0 3px 12px rgba(31,41,55,.12); font-size: 11px; line-height: 1.4; }
 .real-map__notice { top: 12px; left: 12px; }
 .real-map__notice--error { border-color: #f4c7c7; color: #8d2727; }
+.real-map__notice--warning { top: 12px; left: 12px; border-color: #f3d7a6; color: #77520b; }
 .real-map__location-notice { bottom: 12px; left: 12px; }
 .real-map__location-notice span { color: var(--color-gray); }
 .real-map__locate { position: absolute; z-index: 500; top: 12px; right: 12px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #cbd5e1; border-radius: 8px; color: var(--color-primary); background: white; box-shadow: 0 1px 5px rgba(31,41,55,.2); }

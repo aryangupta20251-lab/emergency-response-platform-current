@@ -1,4 +1,5 @@
-const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/+$/, '')
+import { getApiBaseUrl } from '../config/api'
+import { throwForApiError } from './apiErrors'
 
 function toQueryString(params = {}) {
   const query = new URLSearchParams()
@@ -11,6 +12,7 @@ function toQueryString(params = {}) {
 }
 
 async function request(path, token, options = {}) {
+  const apiBase = getApiBaseUrl()
   const headers = { ...options.headers }
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.body !== undefined && !headers['Content-Type']) {
@@ -25,7 +27,7 @@ async function request(path, token, options = {}) {
       body: options.body === undefined ? undefined : typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
     })
   } catch {
-    throw new Error('The admin service is unavailable. Check that the backend is running.')
+    throw new Error('Unable to connect to the server. Check your connection.')
   }
 
   let result
@@ -35,14 +37,19 @@ async function request(path, token, options = {}) {
     throw new Error('The admin service returned an unreadable response.')
   }
 
-  if (!response.ok) {
-    throw new Error(result?.message || 'The administrator request could not be completed.')
-  }
+  throwForApiError(response, result, 'The administrator request could not be completed.')
 
   return result
 }
 
 export const adminService = {
+  async createResponderProfile(token, profile) {
+    return request('/responders', token, {
+      method: 'POST',
+      body: profile,
+    })
+  },
+
   async getStatistics(token) {
     return request('/admin/statistics', token)
   },
@@ -73,6 +80,13 @@ export const adminService = {
     return request(`/admin/responders${toQueryString(filters)}`, token)
   },
 
+  async updateResponderProfile(token, id, changes) {
+    return request(`/responders/${encodeURIComponent(id)}/verification`, token, {
+      method: 'PATCH',
+      body: changes,
+    })
+  },
+
   async getPendingResponders(token) {
     return request('/admin/responders/pending', token)
   },
@@ -90,5 +104,16 @@ export const adminService = {
 
   async getActiveIncidents(token) {
     return request('/admin/incidents/active', token)
+  },
+
+  async getIncidentResponders(token, incidentId) {
+    return request(`/incidents/${encodeURIComponent(incidentId)}/responders`, token)
+  },
+
+  async assignResponder(token, incidentId, responderId) {
+    return request(`/incidents/${encodeURIComponent(incidentId)}/assign-responder`, token, {
+      method: 'POST',
+      body: { responderId },
+    })
   },
 }

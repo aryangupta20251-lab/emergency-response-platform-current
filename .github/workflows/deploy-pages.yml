@@ -32,7 +32,19 @@ jobs:
         run: npm install --include-workspace-root
 
       - name: Build web frontend
-        run: npm --workspace web run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::Set the repository Actions variable VITE_API_BASE_URL to the production HTTPS API base URL."
+            exit 1
+          fi
+          if [ -z "$VITE_GOOGLE_MAPS_API_KEY" ]; then
+            echo "::error::Set the repository Actions variable VITE_GOOGLE_MAPS_API_KEY to a referrer-restricted Maps JavaScript API key."
+            exit 1
+          fi
+          npm --workspace web run build
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5

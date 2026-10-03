@@ -152,6 +152,86 @@ test("registration, login, and token authentication", async (context) => {
     assert.ok(claims.exp > claims.iat);
   });
 
+  await context.test("password reset links are single-use, hashed at rest, and expire", async () => {
+    const previousToken = token;
+    let resetLink = "";
+    let requestReset;
+    const originalInfo = console.info;
+    console.info = (message) => { resetLink = String(message).slice(String(message).indexOf("http")); };
+    try {
+      requestReset = await request("/api/auth/password-reset/request", {
+        method: "POST",
+        body: { identifier: email },
+      });
+      assert.equal(requestReset.status, 202);
+      assert.match(requestReset.body.message, /if an active account matches/i);
+    } finally {
+      console.info = originalInfo;
+    }
+
+    const resetToken = new URL(resetLink).searchParams.get("token");
+    assert.match(resetToken, /^[A-Za-z0-9_-]{43}$/);
+    const storedToken = await getPool().query(
+      "SELECT token_hash, expires_at, consumed_at FROM password_reset_tokens WHERE user_id = $1",
+      [registeredUser.id],
+    );
+    assert.equal(storedToken.rowCount, 1);
+    assert.notEqual(storedToken.rows[0].token_hash, resetToken);
+    assert.equal(storedToken.rows[0].consumed_at, null);
+    assert.ok(new Date(storedToken.rows[0].expires_at).getTime() > Date.now());
+
+    const invalid = await request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { token: "invalid", password: "Changed-Password-2026!" },
+    });
+    assert.equal(invalid.status, 400);
+
+    const updated = await request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { token: resetToken, password: "Changed-Password-2026!" },
+    });
+    assert.equal(updated.status, 200);
+    const reused = await request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { token: resetToken, password: "Another-Password-2026!" },
+    });
+    assert.equal(reused.status, 400);
+    await getPool().query(
+      `UPDATE password_reset_tokens
+       SET consumed_at = NULL,
+           created_at = CURRENT_TIMESTAMP - INTERVAL '2 hours',
+           expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'
+       WHERE user_id = $1`,
+      [registeredUser.id],
+    );
+    const expired = await request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: { token: resetToken, password: "Another-Password-2026!" },
+    });
+    assert.equal(expired.status, 400);
+
+    const oldPassword = await request("/api/auth/login", {
+      method: "POST",
+      body: { identifier: email, password },
+    });
+    const newPassword = await request("/api/auth/login", {
+      method: "POST",
+      body: { identifier: email, password: "Changed-Password-2026!" },
+    });
+    assert.equal(oldPassword.status, 401);
+    assert.equal(newPassword.status, 200);
+    token = newPassword.body.token;
+    const invalidatedSession = await request("/api/auth/me", { token: previousToken });
+    assert.equal(invalidatedSession.status, 401);
+
+    const unknownRequest = await request("/api/auth/password-reset/request", {
+      method: "POST",
+      body: { identifier: `missing-${randomUUID()}@example.test` },
+    });
+    assert.equal(unknownRequest.status, requestReset.status);
+    assert.equal(unknownRequest.body.message, requestReset.body.message);
+  });
+
   await context.test("uses the same generic response for incorrect and unknown credentials", async () => {
     const wrongPassword = await request("/api/auth/login", {
       method: "POST",
@@ -220,5 +300,22 @@ test("registration, login, and token authentication", async (context) => {
     assert.equal(response.body.user.role, "citizen");
     assert.equal("password" in response.body.user, false);
     assert.equal("password_hash" in response.body.user, false);
+  });
+
+  await context.test("rejects tokens after account role or status changes", async () => {
+    await getPool().query(
+      "UPDATE users SET role = 'responder' WHERE id = $1",
+      [registeredUser.id],
+    );
+    const staleRole = await request("/api/auth/me", { token });
+    assert.equal(staleRole.status, 401);
+
+    await getPool().query(
+      "UPDATE users SET role = 'citizen', account_status = 'disabled' WHERE id = $1",
+      [registeredUser.id],
+    );
+    const disabledAccount = await request("/api/auth/me", { token });
+    assert.equal(disabledAccount.status, 401);
+    assert.equal(disabledAccount.body.message, "Invalid or expired token.");
   });
 });

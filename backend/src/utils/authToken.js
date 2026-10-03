@@ -13,7 +13,7 @@ function getJwtSecret() {
 
 export function createAuthToken(user) {
   return jwt.sign(
-    { role: user.role },
+    { role: user.role, sessionVersion: user.sessionVersion ?? 0 },
     getJwtSecret(),
     {
       algorithm: "HS256",

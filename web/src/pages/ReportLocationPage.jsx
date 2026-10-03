@@ -30,18 +30,18 @@ export default function ReportLocationPage() {
             locationError: '',
             location: {
               name: 'Selected map point',
-              source: 'Selected on OpenStreetMap',
+              source: 'Selected on Google Maps',
               latitude,
               longitude,
             },
           })}
         />
         <div className="location-choice">
-          {locationReady ? <><CheckCircle2 size={18} /><span><strong>{report.location.name}</strong><small>{report.location.source}{report.location.source === 'Selected on OpenStreetMap' ? ` · ${report.location.latitude.toFixed(5)}, ${report.location.longitude.toFixed(5)}` : ''}</small></span></> : <><MapPin size={18} /><span><strong>{report.locationState === 'loading' ? 'Finding location...' : 'Location not selected'}</strong><small>{report.locationError || 'Use the location control or select a point directly on the map.'}</small></span></>}
+          {locationReady ? <><CheckCircle2 size={18} /><span><strong>{report.location.name}</strong><small>{report.location.source}{report.location.source === 'Selected on Google Maps' ? ` · ${report.location.latitude.toFixed(5)}, ${report.location.longitude.toFixed(5)}` : ''}</small></span></> : <><MapPin size={18} /><span><strong>{report.locationState === 'loading' ? 'Finding location...' : 'Location not selected'}</strong><small>{report.locationError || 'Use the location control or select a point directly on the map.'}</small></span></>}
         </div>
         {report.locationError && <Alert tone="info" title="Location unavailable">{report.locationError}</Alert>}
       </Card>
-      <Alert tone="info" title="Your privacy matters">Your browser location is used only after you request it. This report flow remains a frontend demo and does not contact emergency services.</Alert>
+      <Alert tone="info" title="Your privacy matters">Your browser location is used only after you request it. Location and report details are sent to this platform only when you submit; official emergency services are not contacted.</Alert>
       <div className="report-actions">
         <Button variant="ghost" onClick={() => navigate('/report-accident')}>Back</Button>
         <Button disabled={!locationReady} onClick={() => navigate('/report-accident/information')}>Continue <ArrowRightIcon /></Button>

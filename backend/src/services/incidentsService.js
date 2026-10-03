@@ -169,11 +169,34 @@ function validateRequest(body, { partial = false } = {}) {
     if (typeof location !== "string" || location.trim().length < 2 || location.trim().length > 255) {
       throw httpError(400, "Provide a location name between 2 and 255 characters.");
     }
+    const locationObject = typeof body.location === "object" && body.location !== null
+      ? body.location
+      : null;
     if (body.location && typeof body.location === "object"
-      && Object.keys(body.location).some((field) => !["name", "source"].includes(field))) {
+      && Object.keys(body.location).some((field) => !["name", "source", "latitude", "longitude"].includes(field))) {
       throw httpError(400, "The location contains unsupported fields.");
     }
     incident.locationName = location.trim();
+
+    if (locationObject) {
+      const hasLatitude = Object.hasOwn(locationObject, "latitude");
+      const hasLongitude = Object.hasOwn(locationObject, "longitude");
+      if (hasLatitude !== hasLongitude) {
+        throw httpError(400, "Latitude and longitude must both be provided.");
+      }
+
+      if (hasLatitude) {
+        for (const [field, maximum] of [["latitude", 90], ["longitude", 180]]) {
+          const value = locationObject[field];
+          if (value !== null && (typeof value !== "number" || !Number.isFinite(value)
+            || value < -maximum || value > maximum)) {
+            throw httpError(400, `The ${field} must be a valid geographic coordinate.`);
+          }
+        }
+        incident.latitude = locationObject.latitude;
+        incident.longitude = locationObject.longitude;
+      }
+    }
   }
 
   const editableFields = Object.keys(incident);
@@ -213,8 +236,8 @@ export async function createIncident(reporterId, body) {
     const result = await client.query(
       `INSERT INTO incidents
          (reporter_id, incident_type, people_involved, visible_injuries,
-          vehicles, description, location_name, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'reported')
+          vehicles, description, location_name, latitude, longitude, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'reported')
        RETURNING ${incidentColumns}`,
       [
         reporterId,
@@ -224,6 +247,8 @@ export async function createIncident(reporterId, body) {
         incident.vehicles,
         incident.description,
         incident.locationName,
+        incident.latitude ?? null,
+        incident.longitude ?? null,
       ],
     );
     createdIncident = result.rows[0];
@@ -285,6 +310,8 @@ export async function updateIncident(reporterId, incidentId, body) {
     vehicles: "vehicles",
     description: "description",
     locationName: "location_name",
+    latitude: "latitude",
+    longitude: "longitude",
   };
   const fields = Object.keys(incident);
   const values = [incidentId, reporterId];
