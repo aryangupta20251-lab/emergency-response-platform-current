@@ -13,7 +13,8 @@
       const redirect = sessionStorage.redirect
       delete sessionStorage.redirect
       if (redirect) {
-        history.replaceState(null, '', redirect)
+        const base = '%BASE_URL%'.replace(/\/$/, '')
+        history.replaceState(null, '', `${base}${redirect.startsWith('/') ? redirect : `/${redirect}`}`)
       }
     </script>
   </body>

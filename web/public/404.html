@@ -6,9 +6,9 @@
     <title>Redirecting...</title>
     <script type="text/javascript">
       (function () {
-        const repo = '/emergency-response-platform'
+        const repo = '/emergency-response-platform-current'
         const path = window.location.pathname || '/'
-        const redirect = path.startsWith(repo) ? path.slice(repo.length) || '/' : path
+        const redirect = path.startsWith(`${repo}/`) ? path.slice(repo.length) : path === repo ? '/' : path
         sessionStorage.redirect = redirect + window.location.search + window.location.hash
         window.location.replace(`${repo}/`)
       })()
