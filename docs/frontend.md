@@ -16,3 +16,10 @@ backend to the authenticated responder.
 Google Maps JavaScript API loading is centralized in
 `web/src/services/googleMapsLoader.js`. A real key is external configuration;
 mock/test-double coverage is not evidence of a real Google Maps render.
+
+The production web frontend is hosted on GitHub Pages and uses the Railway
+Express API. The production Google Map has been verified to load real Google
+Maps tiles. The landing preview and citizen dashboard contain explicitly
+labeled sample information; use the incident, hospital, and notification
+screens for their supported backend-backed workflows. The admin hospital view
+is read-only, while audit logging and report export are not implemented.

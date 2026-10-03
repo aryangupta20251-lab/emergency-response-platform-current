@@ -86,7 +86,6 @@ Create a backend `.env` from the example file and set secure values for:
 - `NODE_ENV`
 - `PASSWORD_RESET_DELIVERY`, `PASSWORD_RESET_URL`, and (for webhook delivery)
   `PASSWORD_RESET_WEBHOOK_URL` / `PASSWORD_RESET_WEBHOOK_TOKEN`
-- `TEST_DATABASE_URL` for the isolated backend integration-test database
 
 Do not commit real secrets or production credentials.
 
@@ -187,7 +186,9 @@ the page host for API and Socket.IO requests.
 The Expo app is a navigation and visual shell only. Welcome, demo login, and
 dashboard screens are placeholders; mobile authentication, backend
 integration, reporting, and responder workflows are not implemented. Do not
-use it as a production emergency-response client.
+use it as a production emergency-response client. Android export has an
+outstanding `react-native-screens`/Expo compatibility failure; it is not a
+verified installable mobile release.
 
 ## Testing and validation
 
@@ -199,37 +200,77 @@ back to `DATABASE_URL`. Do not point it at production or a database containing
 data you need.
 
 ```powershell
-Set-Location backend
+Set-Location D:\new\EmergencyResponsePlatform\backend
 npm test
 ```
 
-Frontend build:
+Frontend unit tests and production build:
 
-```bash
-npm --workspace web run build
+```powershell
+Set-Location D:\new\EmergencyResponsePlatform
+node --test web/test/*.test.js
+npm run web:build
 ```
 
-## GitHub Pages deployment
+The backend test runner refuses to use `DATABASE_URL` as a fallback. Do not
+point it at a production database or any database containing data you need.
+The current local test suite has 63 backend tests and 8 frontend tests.
 
-The repository includes a GitHub Actions workflow for deploying the frontend
-to GitHub Pages. Before enabling it, configure the repository Actions variables
-`VITE_API_BASE_URL` (the production HTTPS API base URL, including `/api`) and
-`VITE_GOOGLE_MAPS_API_KEY` (a browser key restricted to the deployed referrer
-and Maps JavaScript API). The workflow stops before deployment if either value
-is missing. The Maps key is embedded in the browser build and must be referrer-
-restricted; it is not a server-side secret.
+## Production deployment status
 
-GitHub Pages serves only the frontend. A separately hosted production Express
-backend and PostgreSQL database are required. This repository has no verified
-live Pages deployment or production backend URL at present.
+The existing production frontend is hosted on
+[GitHub Pages](https://aryangupta20251-lab.github.io/emergency-response-platform-current/).
+The most recent application-code revision, `c022d2d`, passed its GitHub Pages
+build and deployment workflow. This documentation-only update does not change
+the frontend or backend code. The workflow is defined in
+[`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml);
+it requires the repository Actions variables `VITE_API_BASE_URL` (the HTTPS
+backend API base URL ending in `/api`) and `VITE_GOOGLE_MAPS_API_KEY` (a
+browser key restricted to approved website referrers and Maps JavaScript API).
+The Maps key is embedded in browser code and is not a server-side secret.
 
-## Important production note
+The existing Express API is deployed on
+Railway at `https://emergency-response-platform-current-production.up.railway.app/api`.
+The Railway production service uses this repository's `main` branch, the
+`backend/` root directory, and the existing PostgreSQL service. The last
+verified successful Railway deployment runs commit
+`c022d2d92dbb464f28e0c852bec6fcf8dc223da5`; `/api/health` reported success
+with PostgreSQL connected. Automatic deploys are disabled, so a backend code
+change must be deployed from the existing Railway service. Do not create a
+second service or project.
 
-GitHub Pages hosts only the frontend. The backend remains a separate application that must be deployed to an environment with its own infrastructure and database credentials. The project is production-configurable, but it does not claim to have a public production backend without explicit external deployment setup.
+Real Google Maps JavaScript API tiles and controls have been verified on the
+production Pages site. The configured browser key's Google Cloud restrictions
+must still be managed and reviewed in Google Cloud; never add its value to
+source control.
 
-Password reset is implemented, but a real email/SMS provider is not bundled;
-production delivery requires an explicitly configured HTTPS webhook.
-Hospital emergency flags are stored directory data, not live capacity. The
-platform does not contact emergency services, provide dispatch, or give
-medical advice; for a life-threatening emergency, contact official emergency
-services such as 112 or 108.
+GitHub Pages serves only the frontend; the API and PostgreSQL remain separate
+services. Production health and safe authentication failure paths have been
+checked. Do not create production test accounts or incidents without an
+approved cleanup procedure. The production hospital endpoint returned an
+empty directory during the latest check; no live hospital records have been
+verified or seeded into production.
+
+## Known limitations and safety
+
+- This platform does **not** replace 112/108 or official emergency dispatch,
+  does not contact emergency services, and does not guarantee a response.
+- It does not provide verified ambulance availability or guaranteed live
+  hospital capacity. Hospital emergency flags are stored directory data.
+  Nearby distances use approximate straight-line calculations, not driving
+  routes.
+- Production hospital results depend on records entered in the backend
+  directory; development seed records use synthetic coordinates and are
+  labeled as samples. The landing and citizen dashboard also contain clearly
+  labeled sample content and must not be mistaken for live user or location
+  data.
+- The web client does not expose exact responder locations to citizens.
+- Password-reset tokens are hashed, single-use, and expire after 30 minutes.
+  A generic HTTPS webhook transport exists, but no bundled email/SMS provider
+  is included and external email, SMS, or push delivery has not been verified.
+- The admin audit-log, hospital create/edit, and report-export screens explain
+  that their supporting backend capabilities are not implemented.
+- The mobile app is a preview shell only. No physical-phone journey has been
+  verified.
+- This software does not provide medical advice. For a life-threatening
+  emergency, contact official emergency services such as 112 or 108.
