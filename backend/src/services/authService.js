@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { getPool } from "../db/pool.js";
+import { disconnectUserSockets } from "../realtime/socket.js";
 import { httpError } from "../utils/httpError.js";
 import { deliverPasswordReset } from "./passwordResetDelivery.js";
 
@@ -277,6 +278,11 @@ export async function resetPassword({ token, password } = {}) {
     );
     await client.query("COMMIT");
     transactionStarted = false;
+    try {
+      await disconnectUserSockets(reset.user_id);
+    } catch (error) {
+      console.error("Could not disconnect realtime sessions after password reset:", error);
+    }
     return true;
   } catch (error) {
     if (transactionStarted) await client.query("ROLLBACK");

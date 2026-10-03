@@ -36,11 +36,13 @@ export function attachRealtime(httpServer) {
       }
 
       const result = await getPool().query(
-        "SELECT role, account_status FROM users WHERE id = $1",
+        "SELECT role, account_status, session_version FROM users WHERE id = $1",
         [claims.sub],
       );
       const user = result.rows[0];
-      if (!user || user.account_status !== "active" || user.role !== claims.role) {
+      if (!user || user.account_status !== "active" || user.role !== claims.role
+        || !Number.isInteger(claims.sessionVersion)
+        || claims.sessionVersion !== Number(user.session_version)) {
         next(new Error("Invalid or expired token."));
         return;
       }
@@ -64,6 +66,13 @@ export function emitUserEvent(userId, eventName, payload) {
   if (!io) return false;
   io.to(userRoom(userId)).emit(eventName, payload);
   return true;
+}
+
+export async function disconnectUserSockets(userId) {
+  if (!io) return 0;
+  const sockets = await io.in(userRoom(userId)).fetchSockets();
+  for (const socket of sockets) socket.disconnect(true);
+  return sockets.length;
 }
 
 export async function closeRealtime() {

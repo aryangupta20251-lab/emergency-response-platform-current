@@ -37,7 +37,7 @@ async function createTestAccount(baseUrl, label, role = "citizen") {
     body: { identifier, password: testPassword },
   });
   assert.equal(login.status, 200);
-  return { user, token: login.body.token };
+  return { user, identifier, token: login.body.token };
 }
 
 function waitForEvent(socket, eventName, timeoutMs = 4000) {
@@ -85,7 +85,8 @@ test("notifications persist per user and realtime incident updates stay user-sco
     const citizenB = await createTestAccount(baseUrl, "notifications-b");
     const admin = await createTestAccount(baseUrl, "notifications-admin", "admin");
     const responder = await createTestAccount(baseUrl, "notifications-responder", "responder");
-    createdUserIds.push(citizenA.user.id, citizenB.user.id, admin.user.id, responder.user.id);
+    const resetUser = await createTestAccount(baseUrl, "notifications-reset-session");
+    createdUserIds.push(citizenA.user.id, citizenB.user.id, admin.user.id, responder.user.id, resetUser.user.id);
 
     const profile = await request(baseUrl, "/api/responders", {
       method: "POST",
@@ -109,7 +110,8 @@ test("notifications persist per user and realtime incident updates stay user-sco
     const socketA = await connectSocket(baseUrl, citizenA.token);
     const socketB = await connectSocket(baseUrl, citizenB.token);
     const responderSocket = await connectSocket(baseUrl, responder.token);
-    sockets.push(socketA, socketB, responderSocket);
+    const resetSocket = await connectSocket(baseUrl, resetUser.token);
+    sockets.push(socketA, socketB, responderSocket, resetSocket);
 
     let notificationsSeenByB = 0;
     socketB.on("notification:new", () => { notificationsSeenByB += 1; });
@@ -126,6 +128,58 @@ test("notifications persist per user and realtime incident updates stay user-sco
       });
       assert.match(connectionError.message, /Authentication required/i);
       unauthenticatedSocket.close();
+    });
+
+    await context.test("password reset revokes existing and future realtime sessions", async () => {
+      let resetLink = "";
+      const originalInfo = console.info;
+      console.info = (message) => { resetLink = String(message).slice(String(message).indexOf("http")); };
+      let resetRequest;
+      try {
+        resetRequest = await request(baseUrl, "/api/auth/password-reset/request", {
+          method: "POST",
+          body: { identifier: resetUser.identifier },
+        });
+      } finally {
+        console.info = originalInfo;
+      }
+      assert.equal(resetRequest.status, 202);
+      const resetToken = new URL(resetLink).searchParams.get("token");
+      assert.match(resetToken, /^[A-Za-z0-9_-]{43}$/);
+
+      const disconnected = new Promise((resolve) => resetSocket.once("disconnect", resolve));
+      const changed = await request(baseUrl, "/api/auth/password-reset/confirm", {
+        method: "POST",
+        body: { token: resetToken, password: "Changed-Session-Password-2026!" },
+      });
+      assert.equal(changed.status, 200);
+      await disconnected;
+
+      const staleApiSession = await request(baseUrl, "/api/auth/me", { token: resetUser.token });
+      assert.equal(staleApiSession.status, 401);
+      const staleSocket = createSocketClient(baseUrl, {
+        auth: { token: resetUser.token },
+        transports: ["websocket"],
+        reconnection: false,
+        timeout: 3000,
+      });
+      const connectionError = await new Promise((resolve, reject) => {
+        staleSocket.once("connect", () => reject(new Error("A reset session reconnected.")));
+        staleSocket.once("connect_error", resolve);
+      });
+      assert.match(connectionError.message, /Invalid or expired token/i);
+      staleSocket.close();
+
+      const oldPassword = await request(baseUrl, "/api/auth/login", {
+        method: "POST",
+        body: { identifier: resetUser.identifier, password: testPassword },
+      });
+      const newPassword = await request(baseUrl, "/api/auth/login", {
+        method: "POST",
+        body: { identifier: resetUser.identifier, password: "Changed-Session-Password-2026!" },
+      });
+      assert.equal(oldPassword.status, 401);
+      assert.equal(newPassword.status, 200);
     });
 
     let incidentId;
